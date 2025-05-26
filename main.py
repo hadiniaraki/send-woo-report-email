@@ -54,6 +54,7 @@ if not all([EMAIL_SENDER, EMAIL_PASSWORD, SMTP_SERVER, SMTP_PORT]):
     logger.warning("WARNING: One or more email environment variables (sender or server) are missing. Email sending might not function correctly.")
 
 # --- Functions ---
+
 def get_orders_from_yesterday():
     """Fetches all completed orders from the previous day from the WooCommerce API."""
     yesterday = (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d')
@@ -145,6 +146,10 @@ def create_excel_report(orders_data):
 
     df = pd.DataFrame(processed_data)
     
+    # --- Sort the DataFrame by 'تاریخ سفارش (شمسی)' (Jalali Order Date) ---
+    # This will sort based on the string representation, which should work correctly for YYYY/MM/DD HH:MM:SS format.
+    df = df.sort_values(by="تاریخ سفارش (شمسی)", ascending=True)
+
     excel_filename = f"WooCommerce_Orders_{datetime.now().strftime('%Y-%m-%d')}.xlsx"
     try:
         df.to_excel(excel_filename, index=False, engine='openpyxl')
@@ -188,6 +193,7 @@ def create_excel_report(orders_data):
                                           get_column_letter(df.columns.get_loc("آدرس") + 1)]:
                     cell.alignment = wrap_text_alignment
 
+                # CORRECTED TYPO: "نام آیتم‌ها" instead of "نام آیتm‌ها"
                 if cell.column_letter == get_column_letter(df.columns.get_loc("نام آیتم‌ها") + 1):
                     cell.fill = item_name_fill
         
