@@ -18,19 +18,31 @@ class ExcelReporter:
         processed_data = []
         for order in orders_data:
             try:
-                item_names = [item['name'] for item in order.get('line_items', [])]
-
-                item_quantities = []
+                item_details = []
                 for item in order.get('line_items', []):
+                    item_name = item['name']
                     quantity = item.get('quantity', 0)
+                    unit_price = float(item.get('price', 0)) # اضافه کردن قیمت واحد
+
                     refunded_qty_for_this_item = 0
                     for refund in order.get('refunds', []):
                         for refunded_item in refund.get('line_items', []):
                             if refunded_item.get('product_id') == item.get('product_id') and \
                                refunded_item.get('variation_id', 0) == item.get('variation_id', 0):
                                 refunded_qty_for_this_item += refunded_item.get('qty', 0)
+                    
+                    # محاسبه تعداد نهایی با کسر مرجوعی
+                    final_quantity = quantity - refunded_qty_for_this_item
+                    item_details.append({
+                        "name": item_name,
+                        "quantity": final_quantity,
+                        "unit_price": unit_price # اضافه کردن قیمت واحد به جزئیات آیتم
+                    })
 
-                item_quantities.append(str(quantity - refunded_qty_for_this_item))
+                # جدا کردن نام آیتم‌ها، تعداد و قیمت واحد با کاراکتر newline
+                item_names_str = "\n".join([detail['name'] for detail in item_details])
+                item_quantities_str = "\n".join([str(detail['quantity']) for detail in item_details])
+                item_unit_prices_str = "\n".join([str(detail['unit_price']) for detail in item_details]) # ایجاد رشته برای قیمت واحد
 
                 order_refund_total = sum(float(refund.get('total', 0)) for refund in order.get('refunds', []))
 
@@ -59,8 +71,9 @@ class ExcelReporter:
                     "مبلغ حمل و نقل": float(order.get('shipping_lines', [{}])[0].get('total', 0)) if order.get('shipping_lines') else 0,
                     "مبلغ استرداد کل سفارش": order_refund_total,
                     "مجموع نهایی سفارش (پس از کسر استرداد)": float(order.get('total', 0)) - order_refund_total,
-                    "نام آیتم‌ها": "\n".join(item_names),
-                    "تعداد آیتم‌ها (- استرداد)": "\n".join(item_quantities),
+                    "نام آیتم‌ها": item_names_str,
+                    "تعداد آیتم‌ها (- استرداد)": item_quantities_str,
+                    "قیمت واحد آیتم‌ها": item_unit_prices_str, # اضافه کردن ستون جدید
                     "مجموع هزینه آیتم‌ها": sum(float(item.get('total', 0)) for item in order.get('line_items', []))
                 }
                 processed_data.append(order_row)
@@ -111,12 +124,14 @@ class ExcelReporter:
 
             for row in sheet.iter_rows(min_row=2):
                 for cell in row:
-                    if cell.column_letter in [get_column_letter(df.columns.get_loc("نام آیتم‌ها") + 1),
-                                              get_column_letter(df.columns.get_loc("تعداد آیتم‌ها (- استرداد)") + 1),
-                                              get_column_letter(df.columns.get_loc("آدرس") + 1)]:
+                    if cell.column_letter in [
+                        get_column_letter(df.columns.get_loc("نام آیتم‌ها") + 1),
+                        get_column_letter(df.columns.get_loc("تعداد آیتم‌ها (- استرداد)") + 1),
+                        get_column_letter(df.columns.get_loc("قیمت واحد آیتم‌ها") + 1), # اضافه کردن ستون جدید برای alignment
+                        get_column_letter(df.columns.get_loc("آدرس") + 1)
+                    ]:
                         cell.alignment = wrap_text_alignment
 
-                    # CORRECTED TYPO: "نام آیتم‌ها"
                     if cell.column_letter == get_column_letter(df.columns.get_loc("نام آیتم‌ها") + 1):
                         cell.fill = item_name_fill
             
