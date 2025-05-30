@@ -4,6 +4,8 @@ from config import Config
 from woocommerce_client import WooCommerceClient
 from excel_reporter import ExcelReporter
 from email_sender import EmailSender
+from datetime import datetime, timedelta
+import jdatetime
 
 # --- Logging Configuration ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -23,6 +25,14 @@ def main():
     email_config_valid = Config.validate_email_config() # Email config is warned, not critical exit
 
     try:
+        # Calculate yesterday's date in Gregorian for fetching orders and
+        # convert to Jalali for the Excel filename.
+        yesterday_dt = datetime.now() - timedelta(days=1)
+        
+        # Convert Gregorian yesterday's date to Jalali for the filename
+        jalali_date_for_filename = jdatetime.datetime.fromtimestamp(yesterday_dt.timestamp())
+        formatted_jalali_date_for_filename = jalali_date_for_filename.strftime('%Y-%m-%d')
+
         # 2. Initialize Clients/Components
         woo_client = WooCommerceClient(
             base_url=Config.WOO_BASE_URL,
@@ -43,7 +53,8 @@ def main():
         orders = woo_client.get_orders_from_yesterday()
 
         if orders:
-            excel_file = excel_reporter.create_excel_report(orders)
+            # Pass the Jalali date string for the filename
+            excel_file = excel_reporter.create_excel_report(orders, formatted_jalali_date_for_filename)
             if excel_file:
                 if email_config_valid: # Only try to send email if config is valid
                     email_sender.send_email_report(excel_file)

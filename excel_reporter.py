@@ -1,3 +1,4 @@
+# excel_reporter.py
 import pandas as pd
 from datetime import datetime
 import os
@@ -13,7 +14,7 @@ class ExcelReporter:
     """
     Handles the creation and styling of Excel reports from order data.
     """
-    def create_excel_report(self, orders_data):
+    def create_excel_report(self, orders_data, report_date_jalali_str):
         """Processes order data and generates an Excel report with styling."""
         processed_data = []
         for order in orders_data:
@@ -22,7 +23,7 @@ class ExcelReporter:
                 for item in order.get('line_items', []):
                     item_name = item['name']
                     quantity = item.get('quantity', 0)
-                    unit_price = float(item.get('price', 0)) # اضافه کردن قیمت واحد
+                    unit_price = float(item.get('price', 0))
 
                     refunded_qty_for_this_item = 0
                     for refund in order.get('refunds', []):
@@ -31,18 +32,16 @@ class ExcelReporter:
                                refunded_item.get('variation_id', 0) == item.get('variation_id', 0):
                                 refunded_qty_for_this_item += refunded_item.get('qty', 0)
                     
-                    # محاسبه تعداد نهایی با کسر مرجوعی
                     final_quantity = quantity - refunded_qty_for_this_item
                     item_details.append({
                         "name": item_name,
                         "quantity": final_quantity,
-                        "unit_price": unit_price # اضافه کردن قیمت واحد به جزئیات آیتم
+                        "unit_price": unit_price
                     })
 
-                # جدا کردن نام آیتم‌ها، تعداد و قیمت واحد با کاراکتر newline
                 item_names_str = "\n".join([detail['name'] for detail in item_details])
                 item_quantities_str = "\n".join([str(detail['quantity']) for detail in item_details])
-                item_unit_prices_str = "\n".join([str(detail['unit_price']) for detail in item_details]) # ایجاد رشته برای قیمت واحد
+                item_unit_prices_str = "\n".join([str(detail['unit_price']) for detail in item_details])
 
                 order_refund_total = sum(float(refund.get('total', 0)) for refund in order.get('refunds', []))
 
@@ -73,7 +72,7 @@ class ExcelReporter:
                     "مجموع نهایی سفارش (پس از کسر استرداد)": float(order.get('total', 0)) - order_refund_total,
                     "نام آیتم‌ها": item_names_str,
                     "تعداد آیتم‌ها (- استرداد)": item_quantities_str,
-                    "قیمت واحد آیتم‌ها": item_unit_prices_str, # اضافه کردن ستون جدید
+                    "قیمت واحد آیتم‌ها": item_unit_prices_str,
                     "مجموع هزینه آیتم‌ها": sum(float(item.get('total', 0)) for item in order.get('line_items', []))
                 }
                 processed_data.append(order_row)
@@ -83,14 +82,12 @@ class ExcelReporter:
 
         df = pd.DataFrame(processed_data)
         
-        # --- Sort the DataFrame by 'تاریخ سفارش (شمسی)' (Jalali Order Date) ---
         df = df.sort_values(by="تاریخ سفارش (شمسی)", ascending=True)
 
-        excel_filename = f"WooCommerce_Orders_{datetime.now().strftime('%Y-%m-%d')}.xlsx"
+        excel_filename = f"site_Orders_{report_date_jalali_str}.xlsx"
         try:
             df.to_excel(excel_filename, index=False, engine='openpyxl')
 
-            # --- Apply Excel Styling ---
             workbook = load_workbook(excel_filename)
             sheet = workbook.active
 
@@ -127,7 +124,7 @@ class ExcelReporter:
                     if cell.column_letter in [
                         get_column_letter(df.columns.get_loc("نام آیتم‌ها") + 1),
                         get_column_letter(df.columns.get_loc("تعداد آیتم‌ها (- استرداد)") + 1),
-                        get_column_letter(df.columns.get_loc("قیمت واحد آیتم‌ها") + 1), # اضافه کردن ستون جدید برای alignment
+                        get_column_letter(df.columns.get_loc("قیمت واحد آیتم‌ها") + 1),
                         get_column_letter(df.columns.get_loc("آدرس") + 1)
                     ]:
                         cell.alignment = wrap_text_alignment

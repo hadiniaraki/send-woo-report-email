@@ -21,9 +21,12 @@ class WooCommerceClient:
             logger.critical(f"FATAL: Error configuring WooCommerce API: {e}")
             raise  # Re-raise the exception to be caught in main or higher level
 
-    def get_orders_from_yesterday(self):  # اصلاح به متد نمونه (self)
-        """Fetches all completed and processing orders from the previous day from the WooCommerce API."""
-        yesterday = (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d')
+    def get_orders_from_yesterday(self):
+        """
+        Fetches all completed and processing orders from the previous day from the WooCommerce API.
+        """
+        yesterday_dt = datetime.now() - timedelta(days=1)
+        yesterday = yesterday_dt.strftime('%Y-%m-%d')
         
         all_orders = []
         page = 1
@@ -31,8 +34,8 @@ class WooCommerceClient:
 
         try:
             while True:
-                response_json = self.wcapi.get("orders", params={  # استفاده از self.wcapi
-                    "status": "completed,processing",  # رشته با مقادیر جدا شده توسط کاما
+                response_json = self.wcapi.get("orders", params={
+                    "status": "completed,processing",
                     "after": f"{yesterday}T00:00:00",
                     "before": f"{yesterday}T23:59:59",
                     "per_page": per_page,

@@ -42,12 +42,12 @@ class EmailSender:
         if self.receiver_cc:
             msg['Cc'] = ", ".join(self.receiver_cc)
 
-        msg['Subject'] = f"گزارش سفارشات ووکامرس - {datetime.now().strftime('%Y-%m-%d')}"
+        msg['Subject'] = f"گزارش سفارشات سایت - {datetime.now().strftime('%Y-%m-%d')}"
 
         yesterday_datetime_obj = datetime.now() - timedelta(days=1)
         yesterday_jalali = jdatetime.datetime.fromtimestamp(yesterday_datetime_obj.timestamp()).strftime('%Y/%m/%d')
         
-        body = f"با سلام،\n\nفایل اکسل گزارش سفارشات ووکامرس برای روز گذشته ({yesterday_jalali}) پیوست شده است.\n\nبا احترام - واحد انفورماتیک"
+        body = f"با سلام،\n\nفایل اکسل گزارش سفارشات سایت برای روز گذشته ({yesterday_jalali}) پیوست شده است.\n\nبا احترام - واحد انفورماتیک"
         msg.attach(MIMEText(body, 'plain'))
 
         if excel_file_path and os.path.exists(excel_file_path):
