@@ -1,3 +1,4 @@
+# excel_reporter.py
 import pandas as pd
 from datetime import datetime
 import os
@@ -14,31 +15,8 @@ class ExcelReporter:
     """
     Handles the creation and styling of Excel reports from order data.
     """
-    
-    def _get_buyer_name(self, order):
-        """Helper to get buyer name based on user type."""
-        user_type = next((meta['value'] for meta in order.get('meta_data', []) if meta['key'] == '_user_type'), 'individual')
-        if user_type == 'corporate':
-            return order.get('billing', {}).get('company', '')
-        else:
-            first_name = order.get('billing', {}).get('first_name', '')
-            last_name = order.get('billing', {}).get('last_name', '')
-            return f"{first_name} {last_name}".strip()
-
     def create_excel_report(self, orders_data):
-        """
-        Processes order data and generates two Excel reports:
-        1. The main comprehensive report.
-        2. A simplified report based on 'tis.xlsx' template, consolidating all items of individual customers.
-        
-        Args:
-            orders_data (list): A list of dictionaries, where each dictionary represents an order.
-
-        Returns:
-            tuple: A tuple containing:
-                - str: Path to the main comprehensive Excel file (or None if creation failed).
-                - list: A list containing the path to the consolidated templated Excel file (or empty list if creation failed).
-        """
+        """Processes order data and generates an Excel report with styling."""
         processed_data = []
         
         # --- Prepare the templated Excel file (tis-{تاریخ شمسی}.xlsx) ONCE ---
@@ -115,75 +93,20 @@ class ExcelReporter:
 
         for order in orders_data:
             try:
-                # --- Common Data Extraction for both reports ---
-                user_type = next((meta['value'] for meta in order.get('meta_data', []) if meta['key'] == '_user_type'), 'individual')
-                
-                company_name = order.get('billing', {}).get('company', '') if user_type == 'corporate' else ''
-                national_id = next((meta['value'] for meta in order.get('meta_data', []) if meta['key'] == '_co_national_id'), '') if user_type == 'corporate' else ''
-                register_id = next((meta['value'] for meta in order.get('meta_data', []) if meta['key'] == '_register_id'), '') if user_type == 'corporate' else ''
+                item_names = [item['name'] for item in order.get('line_items', [])]
 
-                item_names = []
                 item_quantities = []
-                item_prices_no_tax = []
-                item_vat_amounts = []
-                total_items_vat = 0.0
-                total_items_price_no_tax = 0.0
-
-                buyer_name = self._get_buyer_name(order) 
-
-                # --- IMPORTANT: Skip corporate orders for the templated Excel file (tis.xlsx) ---
-                if workbook_template and sheet_body and user_type == 'corporate':
-                    logger.info(f"INFO: Skipping order {order.get('id', 'N/A')} for templated report (tis.xlsx) as buyer is corporate.")
-                    # Continue to process this order for the main report, but skip templated report part
-                    # No need to `continue` the outer loop here, as we still want to process for the main report.
-
-                # Process line items for both reports
                 for item in order.get('line_items', []):
                     item_name = item['name']
                     quantity = item.get('quantity', 0)
-                    item_total_price = float(item.get('total', 0)) # This is the price *including* tax
-
                     refunded_qty_for_this_item = 0
                     for refund in order.get('refunds', []):
                         for refunded_item in refund.get('line_items', []):
                             if refunded_item.get('product_id') == item.get('product_id') and \
                                refunded_item.get('variation_id', 0) == item.get('variation_id', 0):
                                 refunded_qty_for_this_item += refunded_item.get('qty', 0)
-                    
-                    effective_quantity = quantity - refunded_qty_for_this_item
 
-                    # Calculate price without VAT and VAT amount for each item
-                    # Assuming 10% VAT is included in 'total' price
-                    if item_total_price > 0:
-                        price_no_tax_per_item = item_total_price / 1.10
-                        vat_per_item = item_total_price - price_no_tax_per_item
-                    else:
-                        price_no_tax_per_item = 0.0
-                        vat_per_item = 0.0
-                    
-                    item_names.append(item_name)
-                    item_quantities.append(str(effective_quantity)) 
-                    item_prices_no_tax.append(f"{price_no_tax_per_item:,.0f}")
-                    item_vat_amounts.append(f"{vat_per_item:,.0f}")
-
-                    total_items_vat += vat_per_item
-                    total_items_price_no_tax += price_no_tax_per_item
-
-                    # --- Populate the templated Excel file for EACH ITEM (only for individual customers) ---
-                    if workbook_template and sheet_body and user_type == 'individual': 
-                        try:
-                            sheet_body.cell(row=current_row_for_template, column=COL_DESCRIPTION, value=item_name)
-                            sheet_body.cell(row=current_row_for_template, column=COL_QUANTITY, value=effective_quantity)
-                            sheet_body.cell(row=current_row_for_template, column=COL_UNIT, value="عدد")
-                            # Ensure numerical value for calculation in Excel, then format display
-                            sheet_body.cell(row=current_row_for_template, column=COL_UNIT_PRICE, value=round(price_no_tax_per_item)) 
-                            sheet_body.cell(row=current_row_for_template, column=COL_DISCOUNT, value=0) # Placeholder for discount
-                            sheet_body.cell(row=current_row_for_template, column=COL_VAT_RATE, value=10) # Fixed VAT rate
-                            sheet_body.cell(row=current_row_for_template, column=COL_OTHER_TAX_SUBJECT, value=buyer_name)
-                            current_row_for_template += 1
-                        except Exception as e:
-                            logger.error(f"ERROR: Error writing item '{item_name}' of order {order.get('id', 'N/A')} to templated report: {e}")
-
+                item_quantities.append(str(quantity - refunded_qty_for_this_item))
 
                 order_refund_total = sum(float(refund.get('total', 0)) for refund in order.get('refunds', []))
 
@@ -217,12 +140,10 @@ class ExcelReporter:
                     "روش حمل و نقل": order.get('shipping_lines', [{}])[0].get('method_title', '') if order.get('shipping_lines') else '',
                     "مبلغ حمل و نقل": float(order.get('shipping_lines', [{}])[0].get('total', 0)) if order.get('shipping_lines') else 0,
                     "مبلغ استرداد کل سفارش": order_refund_total,
-                    "مجموع نهایی سفارش (پس از کسر استرداد و با مالیات)": float(order.get('total', 0)) - order_refund_total,
+                    "مجموع نهایی سفارش (پس از کسر استرداد)": float(order.get('total', 0)) - order_refund_total,
                     "نام آیتم‌ها": "\n".join(item_names),
                     "تعداد آیتم‌ها (- استرداد)": "\n".join(item_quantities),
-                    "قیمت واحد آیتم (بدون مالیات)": "\n".join(item_prices_no_tax),
-                    "مالیات بر ارزش افزوده آیتم": "\n".join(item_vat_amounts),
-                    "مجموع هزینه آیتم‌ها (با مالیات)": sum(float(item.get('total', 0)) for item in order.get('line_items', []))
+                    "مجموع هزینه آیتم‌ها": sum(float(item.get('total', 0)) for item in order.get('line_items', []))
                 }
                 processed_data.append(order_row)
 
@@ -243,14 +164,16 @@ class ExcelReporter:
 
         # --- Generate the main comprehensive report ---
         df = pd.DataFrame(processed_data)
+        
+        # --- Sort the DataFrame by 'تاریخ سفارش (شمسی)' (Jalali Order Date) ---
         df = df.sort_values(by="تاریخ سفارش (شمسی)", ascending=True)
 
-        main_excel_filename = f"WooCommerce_Orders_{datetime.now().strftime('%Y-%m-%d')}.xlsx"
+        excel_filename = f"WooCommerce_Orders_{datetime.now().strftime('%Y-%m-%d')}.xlsx"
         try:
             df.to_excel(main_excel_filename, index=False, engine='openpyxl')
 
-            # --- Apply Excel Styling to main report ---
-            workbook = load_workbook(main_excel_filename)
+            # --- Apply Excel Styling ---
+            workbook = load_workbook(excel_filename)
             sheet = workbook.active
 
             header_fill = PatternFill(start_color="CCE0F0", end_color="CCE0F0", fill_type="solid")
@@ -285,8 +208,6 @@ class ExcelReporter:
                 for cell in row:
                     if cell.column_letter in [get_column_letter(df.columns.get_loc("نام آیتم‌ها") + 1),
                                               get_column_letter(df.columns.get_loc("تعداد آیتم‌ها (- استرداد)") + 1),
-                                              get_column_letter(df.columns.get_loc("قیمت واحد آیتم (بدون مالیات)") + 1),
-                                              get_column_letter(df.columns.get_loc("مالیات بر ارزش افزوده آیتم") + 1),
                                               get_column_letter(df.columns.get_loc("آدرس") + 1)]:
                         cell.alignment = wrap_text_alignment
 
