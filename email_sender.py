@@ -23,8 +23,13 @@ class EmailSender:
         self.receiver_to = [email.strip() for email in receiver_to.split(',')] if receiver_to else []
         self.receiver_cc = [email.strip() for email in receiver_cc.split(',')] if receiver_cc else []
 
-    def send_email_report(self, excel_file_path):
-        """Sends an email with the generated Excel report as an attachment."""
+    def send_email_report(self, excel_file_paths):
+        """
+        Sends an email with the generated Excel reports as attachments.
+
+        Args:
+            excel_file_paths (list): A list of file paths to the Excel reports to be attached.
+        """
         
         if not self.sender_email or not self.sender_password or not self.smtp_server or not self.smtp_port:
             logger.warning("WARNING: Email sending skipped due to missing sender/server credentials.")
@@ -47,20 +52,27 @@ class EmailSender:
         yesterday_datetime_obj = datetime.now() - timedelta(days=1)
         yesterday_jalali = jdatetime.datetime.fromtimestamp(yesterday_datetime_obj.timestamp()).strftime('%Y/%m/%d')
         
-        body = f"با سلام،\n\nفایل اکسل گزارش سفارشات ووکامرس برای روز گذشته ({yesterday_jalali}) پیوست شده است.\n\nبا احترام - واحد انفورماتیک"
+        body = f"با سلام،\n\nفایل(های) اکسل گزارش سفارشات ووکامرس برای روز گذشته ({yesterday_jalali}) پیوست شده است.\n\nبا احترام - واحد انفورماتیک"
         msg.attach(MIMEText(body, 'plain'))
 
-        if excel_file_path and os.path.exists(excel_file_path):
-            try:
-                with open(excel_file_path, 'rb') as f:
-                    attach = MIMEApplication(f.read(), _subtype="xlsx")
-                    attach.add_header('Content-Disposition', 'attachment', filename=os.path.basename(excel_file_path))
-                    msg.attach(attach)
-                logger.info(f"INFO: Excel file '{os.path.basename(excel_file_path)}' successfully attached to email.")
-            except Exception as e:
-                logger.error(f"ERROR: Error attaching Excel file '{excel_file_path}': {e}. Email will be sent without attachment.")
-        else:
-            logger.warning(f"WARNING: Excel file '{excel_file_path}' not found or invalid path. Email will be sent without attachment.")
+        # Iterate through the list of file paths and attach each one
+        attached_files_count = 0
+        for file_path in excel_file_paths:
+            if file_path and os.path.exists(file_path):
+                try:
+                    with open(file_path, 'rb') as f:
+                        attach = MIMEApplication(f.read(), _subtype="xlsx")
+                        attach.add_header('Content-Disposition', 'attachment', filename=os.path.basename(file_path))
+                        msg.attach(attach)
+                    logger.info(f"INFO: Excel file '{os.path.basename(file_path)}' successfully attached to email.")
+                    attached_files_count += 1
+                except Exception as e:
+                    logger.error(f"ERROR: Error attaching Excel file '{file_path}': {e}. This file will not be attached.")
+            else:
+                logger.warning(f"WARNING: Excel file '{file_path}' not found or invalid path. It will not be attached to email.")
+        
+        if attached_files_count == 0:
+            logger.warning("WARNING: No valid Excel files were attached to the email.")
 
         try:
             with smtplib.SMTP(self.smtp_server, self.smtp_port) as server:
