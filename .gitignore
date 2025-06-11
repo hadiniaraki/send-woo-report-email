@@ -175,3 +175,5 @@ cython_debug/
 
 #excel reports created by script
 *.xlsx
+
+s.py

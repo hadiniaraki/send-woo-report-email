@@ -26,9 +26,6 @@ class EmailSender:
     def send_email_report(self, excel_file_paths):
         """
         Sends an email with the generated Excel reports as attachments.
-
-        Args:
-            excel_file_paths (list): A list of file paths to the Excel reports to be attached.
         """
         
         if not self.sender_email or not self.sender_password or not self.smtp_server or not self.smtp_port:
@@ -47,15 +44,18 @@ class EmailSender:
         if self.receiver_cc:
             msg['Cc'] = ", ".join(self.receiver_cc)
 
-        msg['Subject'] = f"گزارش سفارشات سایت - {datetime.now().strftime('%Y-%m-%d')}"
-
-        yesterday_datetime_obj = datetime.now() - timedelta(days=1)
-        yesterday_jalali = jdatetime.datetime.fromtimestamp(yesterday_datetime_obj.timestamp()).strftime('%Y/%m/%d')
+        yesterday_dt_obj = datetime.now() - timedelta(days=1)
+        yesterday_jalali_dt = jdatetime.datetime.fromgregorian(datetime=yesterday_dt_obj)
+        subject_date_str = yesterday_jalali_dt.strftime('%Y-%m-%d')
+        body_date_str = yesterday_jalali_dt.strftime('%Y/%m/%d')
         
-        body = f"با سلام،\n\nفایل اکسل گزارش سفارشات ووکامرس برای روز گذشته ({yesterday_jalali}) پیوست شده است.\n\nبا احترام - واحد انفورماتیک"
-        msg.attach(MIMEText(body, 'plain'))
 
-        # Iterate through the list of file paths and attach each one
+        msg['Subject'] = f"گزارش سفارشات سایت - {subject_date_str}"
+        
+        body = f"با سلام،\n\nفایل اکسل گزارش سفارشات سایت برای روز گذشته ({body_date_str}) پیوست شده است.\n\nبا احترام - واحد انفورماتیک"
+        msg.attach(MIMEText(body, 'plain'))
+        # <--- پایان تغییرات اصلی
+
         attached_files_count = 0
         for file_path in excel_file_paths:
             if file_path and os.path.exists(file_path):
